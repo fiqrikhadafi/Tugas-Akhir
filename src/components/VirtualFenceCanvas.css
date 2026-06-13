@@ -1,0 +1,187 @@
+/* ================================================
+   VIRTUAL FENCE CANVAS — STYLING
+   ================================================ */
+
+.vf-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  background: #111;
+}
+
+/* ── CANVAS WRAPPER ───────────────────────────── */
+
+.vf-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  line-height: 0;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+.vf-canvas-wrapper img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  object-fit: contain;
+  object-position: top;
+}
+
+.vf-canvas-wrapper canvas {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ── FOOTER (INSTRUKSI + TOMBOL) ──────────────── */
+
+.vf-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+}
+
+/* ── INSTRUKSI BAR ────────────────────────────── */
+
+.vf-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.vf-instructions span {
+  font-size: 12px;
+  color: #bbb;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+}
+
+.vf-instructions span strong {
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+/* ── TOMBOL AKSI ──────────────────────────────── */
+
+.vf-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.vf-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "Poppins", sans-serif;
+  letter-spacing: 0.3px;
+}
+
+.vf-btn:active {
+  transform: scale(0.97);
+}
+
+/* Simpan */
+.vf-btn--save {
+  background: linear-gradient(135deg, #4CAF50, #2e7d32);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.35);
+}
+
+.vf-btn--save:hover {
+  background: linear-gradient(135deg, #66BB6A, #388E3C);
+}
+
+.vf-btn--save:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Reset */
+.vf-btn--reset {
+  background: rgba(255, 193, 7, 0.15);
+  color: #FFC107;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.vf-btn--reset:hover {
+  background: rgba(255, 193, 7, 0.25);
+}
+
+/* Batal */
+.vf-btn--cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.vf-btn--cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* ── TOAST NOTIFIKASI ─────────────────────────── */
+
+.vf-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  padding: 16px 28px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  z-index: 20;
+  pointer-events: none;
+  animation: vf-fade-in 0.3s ease;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.vf-toast--success {
+  border: 1px solid rgba(76, 175, 80, 0.5);
+}
+
+.vf-toast--error {
+  border: 1px solid rgba(244, 67, 54, 0.5);
+}
+
+@keyframes vf-fade-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
