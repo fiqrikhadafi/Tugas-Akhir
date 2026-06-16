@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import elephantIcon from "../assets/elephant.svg";
-import gajahBackground from "../assets/gajah1.png";
+import gajahBackground from "../assets/Gajah1.png";
 import {
   login,
   signup,
@@ -40,11 +40,16 @@ export default function Login() {
   const [messageType, setMessageType] =
     useState("error"); // "error" or "success"
 
+  const [loading, setLoading] =
+    useState(false);
+
   //////////////////////////////////////////////////
   // HANDLE LOGIN
   //////////////////////////////////////////////////
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (loading) return;
+
     setMessage("");
 
     if (!username || !password) {
@@ -55,7 +60,12 @@ export default function Login() {
       return;
     }
 
-    const result = login(username, password);
+    setLoading(true);
+    setMessage("Menghubungkan ke backend...");
+    setMessageType("success");
+
+    const result = await login(username, password);
+    setLoading(false);
 
     if (result.success) {
       localStorage.setItem(
@@ -79,7 +89,9 @@ export default function Login() {
   // HANDLE SIGNUP
   //////////////////////////////////////////////////
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
+    if (loading) return;
+
     setMessage("");
 
     if (password !== confirmPassword) {
@@ -88,7 +100,12 @@ export default function Login() {
       return;
     }
 
-    const result = signup(username, password);
+    setLoading(true);
+    setMessage("Membuat akun...");
+    setMessageType("success");
+
+    const result = await signup(username, password);
+    setLoading(false);
 
     if (result.success) {
       setMessage(result.message);
@@ -113,6 +130,8 @@ export default function Login() {
   //////////////////////////////////////////////////
 
   const toggleMode = () => {
+    if (loading) return;
+
     setUsername("");
     setPassword("");
     setConfirmPassword("");
@@ -338,14 +357,25 @@ export default function Login() {
 
             {/* BUTTON */}
             <button
-              style={button}
+              style={{
+                ...button,
+                opacity: loading ? 0.7 : 1,
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
+              }}
+              disabled={loading}
               onClick={
                 isSignup
                   ? handleSignup
                   : handleLogin
               }
             >
-              {isSignup ? "BUAT AKUN" : "LOGIN"}
+              {loading
+                ? "MEMPROSES..."
+                : isSignup
+                  ? "BUAT AKUN"
+                  : "LOGIN"}
             </button>
 
             {/* TOGGLE SIGNUP / LOGIN */}
@@ -357,6 +387,7 @@ export default function Login() {
               </span>
               <button
                 style={toggleLink}
+                disabled={loading}
                 onClick={toggleMode}
               >
                 {isSignup

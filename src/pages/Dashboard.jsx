@@ -22,6 +22,12 @@ export default function Dashboard() {
 
   const [data, setData] = useState(null);
 
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
   // daftar kamera
   const [cameras, setCameras] =
     useState([]);
@@ -112,15 +118,29 @@ export default function Dashboard() {
 
       if (!selectedCamera) return;
 
+      setErrorMessage("");
+
       const res = await getLatest(
         selectedCamera
       );
+
+      if (!res || Object.keys(res).length === 0) {
+        setData(null);
+        setErrorMessage(
+          "Belum ada data deteksi untuk kamera ini."
+        );
+        return;
+      }
 
       setData(res);
 
     } catch (err) {
 
       console.error(err);
+      setData(null);
+      setErrorMessage(
+        "Backend belum terhubung. Pastikan Flask API berjalan dan VITE_API_BASE_URL benar."
+      );
 
     }
   };
@@ -133,9 +153,18 @@ export default function Dashboard() {
 
     try {
 
+      setIsLoading(true);
+      setErrorMessage("");
+
       const res = await getCameras();
 
       setCameras(res);
+
+      if (res.length === 0) {
+        setErrorMessage(
+          "Belum ada kamera terdaftar. Jalankan worker dan kirim minimal satu data deteksi."
+        );
+      }
 
       // otomatis pilih kamera pertama
       if (
@@ -150,6 +179,13 @@ export default function Dashboard() {
     } catch (err) {
 
       console.error(err);
+      setErrorMessage(
+        "Backend belum terhubung. Pastikan Flask API berjalan dan VITE_API_BASE_URL benar."
+      );
+
+    } finally {
+
+      setIsLoading(false);
 
     }
   };
@@ -187,7 +223,7 @@ export default function Dashboard() {
   // LOADING
   //////////////////////////////////////////////////
 
-  if (!data) {
+  if (isLoading) {
 
     return (
 
@@ -196,6 +232,48 @@ export default function Dashboard() {
         <h2 style={loadingText}>
           Loading...
         </h2>
+
+      </div>
+
+    );
+  }
+
+  if (!data) {
+
+    return (
+
+      <div style={loadingContainer}>
+
+        <div style={statusPanel}>
+
+          <h2 style={loadingText}>
+            Dashboard belum siap
+          </h2>
+
+          <p style={statusText}>
+            {errorMessage ||
+              "Sedang menunggu data deteksi terbaru dari backend."}
+          </p>
+
+          <button
+            style={statusButton}
+            onClick={fetchCameras}
+          >
+            Coba Lagi
+          </button>
+
+          <button
+            style={{
+              ...statusButton,
+              background: "rgba(127, 29, 29, 0.28)",
+              color: "#fecaca",
+            }}
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
+
+        </div>
 
       </div>
 
@@ -508,6 +586,43 @@ const loadingContainer = {
 const loadingText = {
   color: "#f7fff9",
   fontWeight: "400",
+};
+
+const statusPanel = {
+  width: "min(520px, calc(100% - 40px))",
+  padding: "28px",
+  borderRadius: "14px",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.07))",
+  border: "1px solid rgba(255,255,255,0.16)",
+  boxShadow:
+    "0 18px 38px rgba(0,0,0,0.26)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "14px",
+  textAlign: "center",
+};
+
+const statusText = {
+  margin: 0,
+  color: "rgba(241,255,246,0.72)",
+  fontSize: "14px",
+  lineHeight: "1.6",
+};
+
+const statusButton = {
+  width: "100%",
+  maxWidth: "220px",
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid rgba(255,255,255,0.16)",
+  background:
+    "linear-gradient(135deg, rgba(82, 183, 136, 0.84), rgba(45, 106, 79, 0.84))",
+  color: "#f7fff9",
+  fontSize: "13px",
+  fontWeight: "600",
+  cursor: "pointer",
 };
 
 //////////////////////////////////////////////////
