@@ -88,21 +88,35 @@ export default function Trend() {
   // JUMLAH AKTIVASI ALARM PER HARI
   //////////////////////////////////////////////////
   const grouped = {};
+  const chronologicalData = [...data].sort(
+    (a, b) =>
+      a.timestamp.localeCompare(b.timestamp)
+  );
+  let previousAlarmActive = false;
 
-  data.forEach((item) => {
+  chronologicalData.forEach((item) => {
 
     const date =
       item.timestamp.split(" ")[0];
+    const result = item.result || "";
+    const isAlarmActive =
+      result.includes("PERINGATAN");
+    const eventMatch = result.match(
+      /Alarm event baru:\s*(\d+)/
+    );
+    const isNewAlarmEvent = eventMatch
+      ? Number(eventMatch[1]) > 0
+      : isAlarmActive && !previousAlarmActive;
 
     if (!grouped[date]) {
       grouped[date] = 0;
     }
 
-    if (
-      item.result.includes("PERINGATAN")
-    ) {
+    if (isNewAlarmEvent) {
       grouped[date] += 1;
     }
+
+    previousAlarmActive = isAlarmActive;
   });
 
   const chartData =
