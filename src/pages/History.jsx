@@ -70,6 +70,44 @@ export default function History() {
 
   }, [selectedCamera]);
 
+  const formatDetailInfo = (item) => {
+    const result = item.result || "";
+    const getValue = (label) => {
+      const match = result.match(
+        new RegExp(`${label}:\\s*([^\\n]+)`)
+      );
+
+      return match ? match[1].trim() : "";
+    };
+
+    const cameraId =
+      getValue("Camera ID") ||
+      item.camera_id ||
+      "-";
+    const totalElephants =
+      getValue("Jumlah Total Gajah") ||
+      item.total ||
+      0;
+    const elephantsEntered =
+      getValue("Jumlah Gajah Masuk Area") ||
+      0;
+    const status =
+      getValue("Status") ||
+      "-";
+    const alarmCount =
+      getValue("Alarm count") ||
+      elephantsEntered ||
+      0;
+
+    return [
+      `Camera ID: ${cameraId}`,
+      `Jumlah Total Gajah: ${totalElephants}`,
+      `Jumlah Gajah Masuk Area: ${elephantsEntered}`,
+      `Status: ${status}`,
+      `Alarm count: ${alarmCount}`,
+    ].join("\n");
+  };
+
   return (
 
     <div style={container}>
@@ -185,7 +223,7 @@ export default function History() {
                 <div style={colInfo}>
 
                   <pre style={infoText}>
-                    {item.result}
+                    {formatDetailInfo(item)}
                   </pre>
 
                 </div>
