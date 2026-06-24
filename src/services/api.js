@@ -7,14 +7,21 @@ export const API_BASE_URL =
 const API = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  headers: {
+    "Cache-Control": "no-cache",
+  },
 });
 
 export default API;
 
-export const getImageUrl = (imagePath) => {
+export const getImageUrl = (imagePath, version = "") => {
   if (!imagePath) return "";
 
-  return `${API_BASE_URL}/${imagePath}`;
+  if (!version) return `${API_BASE_URL}/${imagePath}`;
+
+  const separator = imagePath.includes("?") ? "&" : "?";
+
+  return `${API_BASE_URL}/${imagePath}${separator}v=${encodeURIComponent(version)}`;
 };
 
 //////////////////////////////////////////////////
@@ -25,17 +32,20 @@ export const getLatest = async (
 ) => {
 
   let url = "/api/latest";
+  const params = new URLSearchParams();
 
   // =========================================
   // FILTER CAMERA
   // =========================================
   if (camera) {
 
-    url += `?camera=${camera}`;
+    params.set("camera", camera);
 
   }
 
-  const res = await API.get(url);
+  params.set("_", Date.now().toString());
+
+  const res = await API.get(`${url}?${params.toString()}`);
 
   return res.data;
 };

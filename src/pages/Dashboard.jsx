@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getLatest,
@@ -15,6 +15,8 @@ import VirtualFenceCanvas
   from "../components/VirtualFenceCanvas";
 
 export default function Dashboard() {
+
+  const POLLING_INTERVAL_MS = 1000;
 
   //////////////////////////////////////////////////
   // STATE
@@ -52,6 +54,12 @@ export default function Dashboard() {
     useState(false);
 
   const navigate = useNavigate();
+
+  const isFetchingLatestRef = useRef(false);
+
+  const imageVersion = data
+    ? `${data.id || ""}-${data.timestamp || ""}`
+    : "";
 
   //////////////////////////////////////////////////
   // GET USERNAME
@@ -112,11 +120,14 @@ export default function Dashboard() {
   // FETCH DATA TERBARU
   //////////////////////////////////////////////////
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
 
     try {
 
       if (!selectedCamera) return;
+      if (isFetchingLatestRef.current) return;
+
+      isFetchingLatestRef.current = true;
 
       setErrorMessage("");
 
@@ -142,8 +153,12 @@ export default function Dashboard() {
         "Backend belum terhubung. Pastikan Flask API berjalan dan VITE_API_BASE_URL benar."
       );
 
+    } finally {
+
+      isFetchingLatestRef.current = false;
+
     }
-  };
+  }, [selectedCamera]);
 
   //////////////////////////////////////////////////
   // FETCH CAMERA LIST
@@ -212,12 +227,12 @@ export default function Dashboard() {
 
     const interval = setInterval(
       fetchData,
-      3000
+      POLLING_INTERVAL_MS
     );
 
     return () => clearInterval(interval);
 
-  }, [selectedCamera]);
+  }, [fetchData, selectedCamera]);
 
   //////////////////////////////////////////////////
   // LOADING
@@ -514,7 +529,7 @@ export default function Dashboard() {
 
               <VirtualFenceCanvas
                 imageUrl={
-                  getImageUrl(data.image)
+                  getImageUrl(data.image, imageVersion)
                 }
                 cameraId={selectedCamera}
                 existingPolygon={existingPolygon}
@@ -526,7 +541,7 @@ export default function Dashboard() {
 
               <img
                 src={
-                  getImageUrl(data.image)
+                  getImageUrl(data.image, imageVersion)
                 }
                 alt="hasil"
                 style={{
