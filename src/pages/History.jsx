@@ -72,12 +72,19 @@ export default function History() {
 
   const formatDetailInfo = (item) => {
     const result = item.result || "";
-    const getValue = (label) => {
-      const match = result.match(
-        new RegExp(`${label}:\\s*([^\\n]+)`)
-      );
+    const escapeRegExp = (value) =>
+      value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-      return match ? match[1].trim() : "";
+    const getValue = (...labels) => {
+      for (const label of labels) {
+        const match = result.match(
+          new RegExp(`^${escapeRegExp(label)}:\\s*([^\\n]+)`, "m")
+        );
+
+        if (match) return match[1].trim();
+      }
+
+      return "";
     };
 
     const cameraId =
@@ -89,13 +96,22 @@ export default function History() {
       item.total ||
       0;
     const elephantsEntered =
-      getValue("Jumlah Gajah Masuk Area") ||
+      getValue(
+        "Jumlah Gajah Memasuki Area",
+        "Jumlah Gajah Masuk Area"
+      ) ||
       0;
     const status =
-      getValue("Status") ||
+      getValue(
+        "Status Alarm",
+        "Status"
+      ) ||
       "-";
     const alarmCount =
-      getValue("Alarm count") ||
+      getValue(
+        "Alarm Count",
+        "Alarm count"
+      ) ||
       elephantsEntered ||
       0;
 
