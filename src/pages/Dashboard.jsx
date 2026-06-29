@@ -42,12 +42,14 @@ export default function Dashboard() {
   const [setupMode, setSetupMode] =
     useState(false);
 
-  const [existingPolygon, setExistingPolygon] =
+  const [existingZones, setExistingZones] =
     useState([]);
 
   // Username from localStorage
-  const [username, setUsername] =
-    useState("");
+  const [username] = useState(() =>
+    localStorage.getItem("username") ||
+    "User"
+  );
 
   // Show camera menu
   const [showCameraMenu, setShowCameraMenu] =
@@ -62,17 +64,6 @@ export default function Dashboard() {
     : "";
 
   //////////////////////////////////////////////////
-  // GET USERNAME
-  //////////////////////////////////////////////////
-
-  useEffect(() => {
-    const storedUsername =
-      localStorage.getItem("username") ||
-      "User";
-    setUsername(storedUsername);
-  }, []);
-
-  //////////////////////////////////////////////////
   // SETUP VIRTUAL FENCE HANDLERS
   //////////////////////////////////////////////////
 
@@ -84,13 +75,13 @@ export default function Dashboard() {
         selectedCamera
       );
 
-      setExistingPolygon(
-        fence.polygon || []
+      setExistingZones(
+        fence.zones || []
       );
 
     } catch {
 
-      setExistingPolygon([]);
+      setExistingZones([]);
 
     }
 
@@ -164,7 +155,7 @@ export default function Dashboard() {
   // FETCH CAMERA LIST
   //////////////////////////////////////////////////
 
-  const fetchCameras = async () => {
+  const fetchCameras = useCallback(async () => {
 
     try {
 
@@ -203,7 +194,7 @@ export default function Dashboard() {
       setIsLoading(false);
 
     }
-  };
+  }, [selectedCamera]);
 
   //////////////////////////////////////////////////
   // LOAD CAMERA
@@ -211,9 +202,10 @@ export default function Dashboard() {
 
   useEffect(() => {
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCameras();
 
-  }, []);
+  }, [fetchCameras]);
 
   //////////////////////////////////////////////////
   // POLLING DATA
@@ -299,8 +291,11 @@ export default function Dashboard() {
   // STATUS ALARM
   //////////////////////////////////////////////////
 
-  const isAlarm =
-    data.result?.includes("PERINGATAN");
+  const isAlarmBahaya = data.result?.includes("BAHAYA");
+  const isAlarmPeringatan = data.result?.includes("PERINGATAN");
+  const isAlarm = isAlarmBahaya || isAlarmPeringatan;
+
+  const alarmLabel = isAlarmBahaya ? "BAHAYA" : (isAlarmPeringatan ? "PERINGATAN" : "AMAN");
 
   return (
 
@@ -428,99 +423,101 @@ export default function Dashboard() {
         >
 
           {/* LEFT PANEL */}
-          <div style={leftPanel}>
+          {!setupMode && (
+            <div style={leftPanel}>
 
-            {/* TOTAL GAJAH */}
-            <div style={statsCard}>
+              {/* TOTAL GAJAH */}
+              <div style={statsCard}>
 
-              <h3 style={statsTitle}>
-                Jumlah Total Gajah
-              </h3>
+                <h3 style={statsTitle}>
+                  Jumlah Total Gajah
+                </h3>
 
-              <h1 style={statsNumber}>
-                {data.total}
-              </h1>
+                <h1 style={statsNumber}>
+                  {data.total}
+                </h1>
 
-              <div style={statsSubtext}>
-                Gajah terdeteksi
+                <div style={statsSubtext}>
+                  Gajah terdeteksi
+                </div>
+
               </div>
 
-            </div>
+              {/* ALARM STATUS */}
+              <div
+                style={{
+                  ...alarmCard,
+                  background: isAlarmBahaya 
+                    ? "linear-gradient(145deg, rgba(127, 29, 29, 0.92), rgba(220, 38, 38, 0.78))"
+                    : (isAlarmPeringatan 
+                       ? "linear-gradient(145deg, rgba(161, 98, 7, 0.92), rgba(234, 179, 8, 0.78))"
+                       : "linear-gradient(145deg, rgba(8, 28, 21, 0.84), rgba(45, 106, 79, 0.82))")
+                }}
+              >
 
-            {/* ALARM STATUS */}
-            <div
-              style={{
-                ...alarmCard,
-                background: isAlarm
-                  ? "linear-gradient(145deg, rgba(127, 29, 29, 0.92), rgba(220, 38, 38, 0.78))"
-                  : "linear-gradient(145deg, rgba(8, 28, 21, 0.84), rgba(45, 106, 79, 0.82))",
-              }}
-            >
+                <h3 style={{
+                  ...statsTitle,
+                  color: isAlarm
+                    ? "rgba(255,255,255,0.7)"
+                    : "rgba(255,255,255,0.7)",
+                }}>
+                  Status Alarm
+                </h3>
 
-              <h3 style={{
-                ...statsTitle,
-                color: isAlarm
-                  ? "rgba(255,255,255,0.7)"
-                  : "rgba(255,255,255,0.7)",
-              }}>
-                Status Alarm
-              </h3>
+                <h2 style={{
+                  ...alarmText,
+                  color: isAlarmBahaya
+                    ? "#ffcdd2"
+                    : (isAlarmPeringatan ? "#fef08a" : "#f7fff9"),
+                }}>
 
-              <h2 style={{
-                ...alarmText,
-                color: isAlarm
-                  ? "#ffcdd2"
-                  : "#f7fff9",
-              }}>
+                  {alarmLabel}
 
-                {
-                  isAlarm
-                    ? "PERINGATAN"
-                    : "AMAN"
+                </h2>
+
+                <div style={{
+                  ...statsSubtext,
+                  color: isAlarm
+                    ? "rgba(255,255,255,0.6)"
+                    : "rgba(255,255,255,0.6)",
+                }}>
+                  {isAlarmBahaya
+                    ? "Gajah berada di zona kritis!"
+                    : (isAlarmPeringatan 
+                       ? "Gajah mendekati batas!"
+                       : "Tidak ada aktivitas")}
+                </div>
+
+              </div>
+
+              {/* HISTORY */}
+              <button
+                style={actionButton}
+
+                onClick={() =>
+                  navigate(
+                    `/history?camera=${selectedCamera}`
+                  )
                 }
+              >
+                Log Aktivitas
+              </button>
 
-              </h2>
+              {/* TREND */}
+              <button
+                style={actionButton}
 
-              <div style={{
-                ...statsSubtext,
-                color: isAlarm
-                  ? "rgba(255,255,255,0.6)"
-                  : "rgba(255,255,255,0.6)",
-              }}>
-                {isAlarm
-                  ? "Gajah terdeteksi di area"
-                  : "Tidak ada aktivitas"}
-              </div>
+                onClick={() =>
+                  navigate(
+                    `/trend?camera=${selectedCamera}`
+                  )
+                }
+              >
+                Tren Aktivitas
+              </button>
 
             </div>
-
-            {/* HISTORY */}
-            <button
-              style={actionButton}
-
-              onClick={() =>
-                navigate(
-                  `/history?camera=${selectedCamera}`
-                )
-              }
-            >
-              Log Aktivitas
-            </button>
-
-            {/* TREND */}
-            <button
-              style={actionButton}
-
-              onClick={() =>
-                navigate(
-                  `/trend?camera=${selectedCamera}`
-                )
-              }
-            >
-              Tren Aktivitas
-            </button>
-
-          </div>
+          )}
 
           {/* RIGHT PANEL - CAMERA FEED */}
           <div style={rightPanel}>
@@ -532,7 +529,7 @@ export default function Dashboard() {
                   getImageUrl(data.image, imageVersion)
                 }
                 cameraId={selectedCamera}
-                existingPolygon={existingPolygon}
+                existingZones={existingZones}
                 onSave={handleSaveSetup}
                 onCancel={handleCancelSetup}
               />
@@ -833,33 +830,18 @@ const mainContent = {
 
   position: "relative",
 
-  zIndex: 1,
-
   display: "flex",
-
   justifyContent: "center",
-
-  padding: "24px 30px",
-
-  overflow: "hidden",
-
-  background:
-    "transparent",
+  padding: "30px",
+  boxSizing: "border-box",
 };
 
 const contentInner = {
-
-  display: "flex",
-
-  gap: "24px",
-
   width: "100%",
-
   maxWidth: "1400px",
 
-  height: "100%",
-
-  minHeight: 0,
+  display: "flex",
+  gap: "24px",
 };
 
 //////////////////////////////////////////////////
@@ -867,240 +849,102 @@ const contentInner = {
 //////////////////////////////////////////////////
 
 const leftPanel = {
-
   width: "280px",
-
-  height: "100%",
+  flexShrink: 0,
 
   display: "flex",
-
   flexDirection: "column",
-
-  gap: "16px",
-
-  overflow: "auto",
-
-  paddingRight: "8px",
-
-  background: "transparent",
+  gap: "18px",
 };
-
-//////////////////////////////////////////////////
-// STATS CARD
-//////////////////////////////////////////////////
 
 const statsCard = {
-
-  flex: "1 1 0",
-
-  minHeight: 0,
-
-  boxSizing: "border-box",
-
-  borderRadius: "14px",
-
   background:
-    "linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.07))",
-
-  backdropFilter: "blur(16px)",
-
-  boxShadow:
-    "0 18px 38px rgba(0,0,0,0.26)",
-
-  border:
-    "1px solid rgba(255,255,255,0.16)",
-
+    "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: "14px",
   padding: "24px",
-
+  boxShadow:
+    "0 12px 24px rgba(0,0,0,0.18)",
   display: "flex",
-
   flexDirection: "column",
-
-  justifyContent: "center",
-
   alignItems: "center",
-
   textAlign: "center",
-
-  color: "#f7fff9",
 };
-
-//////////////////////////////////////////////////
-// ALARM CARD
-//////////////////////////////////////////////////
 
 const alarmCard = {
-
-  flex: "1 1 0",
-
-  minHeight: 0,
-
-  boxSizing: "border-box",
-
-  borderRadius: "14px",
-
+  ...statsCard,
+  border: "1px solid rgba(255,255,255,0.2)",
   boxShadow:
-    "0 18px 38px rgba(0,0,0,0.26)",
-
-  border: "1px solid rgba(255,255,255,0.16)",
-
-  backdropFilter: "blur(16px)",
-
-  padding: "24px",
-
-  display: "flex",
-
-  flexDirection: "column",
-
-  justifyContent: "center",
-
-  alignItems: "center",
-
-  textAlign: "center",
+    "0 16px 32px rgba(0,0,0,0.3)",
 };
 
-//////////////////////////////////////////////////
-// STATS TEXT
-//////////////////////////////////////////////////
-
 const statsTitle = {
-
   margin: "0 0 12px 0",
-
-  fontSize: "14px",
-
+  fontSize: "13px",
   fontWeight: "500",
-
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
   color: "rgba(241,255,246,0.68)",
 };
 
 const statsNumber = {
-
-  margin: "0 0 8px 0",
-
-  fontSize: "36px",
-
+  margin: 0,
+  fontSize: "52px",
   fontWeight: "700",
-
   color: "#f7fff9",
+  lineHeight: "1",
 };
 
 const alarmText = {
-
-  margin: "0 0 8px 0",
-
-  fontSize: "28px",
-
+  margin: 0,
+  fontSize: "26px",
   fontWeight: "700",
-
-  color: "#f7fff9",
+  letterSpacing: "1px",
+  lineHeight: "1.2",
 };
 
 const statsSubtext = {
-
-  margin: 0,
-
-  fontSize: "12px",
-
-  fontWeight: "400",
-
-  color: "rgba(241,255,246,0.62)",
+  marginTop: "12px",
+  fontSize: "13px",
+  color: "rgba(241,255,246,0.58)",
 };
-
-//////////////////////////////////////////////////
-// ACTION BUTTONS
-//////////////////////////////////////////////////
 
 const actionButton = {
-
-  height: "44px",
-
-  flexShrink: 0,
-
-  boxSizing: "border-box",
-
-  display: "flex",
-
-  alignItems: "center",
-
-  justifyContent: "center",
-
-  borderRadius: "10px",
-
   background:
-    "linear-gradient(135deg, rgba(82, 183, 136, 0.84), rgba(45, 106, 79, 0.84))",
-
+    "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))",
   border: "1px solid rgba(255,255,255,0.16)",
-
-  padding: "14px 16px",
-
-  textAlign: "center",
-
-  cursor: "pointer",
-
-  fontSize: "13px",
-
-  fontWeight: "600",
-
+  borderRadius: "10px",
+  padding: "14px",
   color: "#f7fff9",
-
+  fontSize: "14px",
+  fontWeight: "600",
+  cursor: "pointer",
   transition: "all 0.3s",
-
-  whiteSpace: "nowrap",
-
   boxShadow:
-    "0 12px 24px rgba(0,0,0,0.18)",
+    "0 8px 16px rgba(0,0,0,0.15)",
 };
 
 //////////////////////////////////////////////////
-// RIGHT PANEL - CAMERA
+// RIGHT PANEL
 //////////////////////////////////////////////////
 
 const rightPanel = {
-
   flex: 1,
-
-  height: "100%",
-
-  display: "flex",
-
-  justifyContent: "center",
-
-  alignItems: "flex-start",
-
-  minHeight: 0,
-
-  overflow: "hidden",
-
-  borderRadius: "14px",
-
+  minWidth: 0,
   background:
-    "linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.06))",
-
-  border:
-    "1px solid rgba(255,255,255,0.14)",
-
-  backdropFilter: "blur(16px)",
-
+    "linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.6))",
+  borderRadius: "16px",
+  border: "1px solid rgba(255,255,255,0.1)",
+  overflow: "hidden",
+  position: "relative",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
   boxShadow:
-    "0 18px 38px rgba(0,0,0,0.28)",
+    "0 24px 48px rgba(0,0,0,0.4)",
 };
 
-//////////////////////////////////////////////////
-// CAMERA IMAGE
-//////////////////////////////////////////////////
-
 const cameraImage = {
-
-  width: "100%",
-
-  height: "100%",
-
   objectFit: "contain",
-
-  objectPosition: "center",
-
-  imageRendering: "auto",
-
-  borderRadius: "14px",
+  display: "block",
 };

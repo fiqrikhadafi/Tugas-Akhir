@@ -34,13 +34,8 @@ export const getLatest = async (
   let url = "/api/latest";
   const params = new URLSearchParams();
 
-  // =========================================
-  // FILTER CAMERA
-  // =========================================
   if (camera) {
-
     params.set("camera", camera);
-
   }
 
   params.set("_", Date.now().toString());
@@ -59,13 +54,8 @@ export const getHistory = async (
 
   let url = "/api/history";
 
-  // =========================================
-  // FILTER CAMERA
-  // =========================================
   if (camera) {
-
     url += `?camera=${camera}`;
-
   }
 
   const res = await API.get(url);
@@ -100,16 +90,16 @@ export const getFence = async (
 };
 
 //////////////////////////////////////////////////
-// SAVE FENCE POLYGON
+// SAVE FENCE ZONES
 //////////////////////////////////////////////////
 export const saveFence = async (
   camera,
-  polygon
+  zones
 ) => {
 
   const res = await API.post(
     `/api/fence?camera=${camera}`,
-    { polygon }
+    { zones }
   );
 
   return res.data;

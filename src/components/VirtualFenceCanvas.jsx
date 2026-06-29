@@ -12,62 +12,35 @@ import {
 
 import "./VirtualFenceCanvas.css";
 
-/**
- * =============================================================
- *   VIRTUAL FENCE CANVAS
- *
- *   Komponen React yang meniru fitur setup_virtual_fence.py
- *   (OpenCV-based) langsung di browser menggunakan HTML Canvas.
- *
- *   Fitur:
- *     Klik kiri      → tambah titik
- *     Klik kanan     → hapus titik terakhir
- *     Drag & drop    → geser titik yang sudah ada
- *     R              → reset semua titik
- *     Enter / S      → simpan
- *     Escape         → batal
- * =============================================================
- */
-
-// ── Konstanta ────────────────────────────────────
 const DRAG_RADIUS = 12;
 const SNAP_RADIUS = 15;
-const POINT_OUTER = 7;
-const POINT_INNER = 4;
+// [EDIT DI SINI]
+// POINT_OUTER mengatur ukuran (radius) titik-titik bulat saat Anda menggambar zona.
+// Standarnya adalah 4. Ubah menjadi lebih besar (misal 7) atau lebih kecil (misal 2).
+const POINT_OUTER = 4;
 
 export default function VirtualFenceCanvas({
   imageUrl,
   cameraId,
-  existingPolygon,
+  existingZones,
   onSave,
   onCancel,
 }) {
-
-  //////////////////////////////////////////////////
-  // REFS
-  //////////////////////////////////////////////////
-
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const wrapperRef = useRef(null);
 
-  //////////////////////////////////////////////////
-  // STATE
-  //////////////////////////////////////////////////
+  const [zones, setZones] = useState([
+    { id: "yellow", name: "Zona Peringatan", polygon: [] },
+    { id: "red", name: "Zona Bahaya", polygon: [] }
+  ]);
+  const [activeZoneId, setActiveZoneId] = useState("yellow");
 
-  const [points, setPoints] = useState([]);
   const [hoverPos, setHoverPos] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState(-1);
-  const [imgNatural, setImgNatural] = useState({
-    w: 0, h: 0,
-  });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
-
-  //////////////////////////////////////////////////
-  // SKALA: display ↔ asli
-  //////////////////////////////////////////////////
 
   const getRenderedRect = useCallback(() => {
     const img = imgRef.current;
@@ -92,7 +65,7 @@ export default function VirtualFenceCanvas({
 
     return {
       x: (cw - rw) / 2,
-      y: 0, // object-position: top
+      y: 0,
       w: rw,
       h: rh,
       sx: rw / nw,
@@ -106,58 +79,42 @@ export default function VirtualFenceCanvas({
     return { sx: r.sx, sy: r.sy };
   }, [getRenderedRect]);
 
-  //////////////////////////////////////////////////
-  // LOAD POLYGON LAMA
-  //////////////////////////////////////////////////
-
   useEffect(() => {
-    if (
-      !existingPolygon ||
-      existingPolygon.length === 0
-    ) return;
-
-    // Perlu menunggu gambar ter-load agar
-    // skala diketahui
+    if (!existingZones || existingZones.length === 0) return;
     const img = imgRef.current;
     if (!img) return;
 
     const loadExisting = () => {
       const { sx, sy } = getScale();
-      const loaded = existingPolygon.map(
-        (pt) => ({
-          x: Math.round(
-            (Array.isArray(pt) ? pt[0] : pt.x) * sx
-          ),
-          y: Math.round(
-            (Array.isArray(pt) ? pt[1] : pt.y) * sy
-          ),
-        })
-      );
-      setPoints(loaded);
+      const newZones = [
+        { id: "yellow", name: "Zona Peringatan", polygon: [] },
+        { id: "red", name: "Zona Bahaya", polygon: [] }
+      ];
+
+      existingZones.forEach(ez => {
+        const targetZone = newZones.find(z => z.id === ez.id);
+        if (targetZone && ez.polygon) {
+          targetZone.polygon = ez.polygon.map(pt => ({
+            x: Math.round((Array.isArray(pt) ? pt[0] : pt.x) * sx),
+            y: Math.round((Array.isArray(pt) ? pt[1] : pt.y) * sy),
+          }));
+        }
+      });
+      setZones(newZones);
     };
 
     if (img.complete) {
       loadExisting();
     } else {
       img.addEventListener("load", loadExisting);
-      return () =>
-        img.removeEventListener("load", loadExisting);
+      return () => img.removeEventListener("load", loadExisting);
     }
-  }, [existingPolygon, getScale]);
-
-  //////////////////////////////////////////////////
-  // IMAGE ONLOAD → set natural dims + resize canvas
-  //////////////////////////////////////////////////
+  }, [existingZones, getScale]);
 
   const handleImageLoad = () => {
     const img = imgRef.current;
     const canvas = canvasRef.current;
     if (!img || !canvas) return;
-
-    setImgNatural({
-      w: img.naturalWidth,
-      h: img.naturalHeight,
-    });
 
     const r = getRenderedRect();
     if (r) {
@@ -165,10 +122,6 @@ export default function VirtualFenceCanvas({
       canvas.height = r.h;
     }
   };
-
-  //////////////////////////////////////////////////
-  // RESIZE OBSERVER
-  //////////////////////////////////////////////////
 
   useEffect(() => {
     const img = imgRef.current;
@@ -187,10 +140,6 @@ export default function VirtualFenceCanvas({
     return () => ro.disconnect();
   }, [getRenderedRect]);
 
-  //////////////////////////////////////////////////
-  // DRAW OVERLAY (mirip draw_overlay di Python)
-  //////////////////////////////////////////////////
-
   const drawOverlay = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -200,120 +149,78 @@ export default function VirtualFenceCanvas({
 
     ctx.clearRect(0, 0, w, h);
 
-    // 1. Isi polygon semi-transparan
-    if (points.length >= 3) {
-      ctx.fillStyle = "rgba(0, 200, 100, 0.25)";
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
+    zones.forEach(zone => {
+      const isYellow = zone.id === "yellow";
+      const fillColor = isYellow ? "rgba(255, 255, 0, 0.25)" : "rgba(255, 0, 0, 0.25)";
+      const strokeColor = isYellow ? "#FFD700" : "#FF3333";
+      const pts = zone.polygon;
+      const isActive = zone.id === activeZoneId;
 
-    // 2. Garis antar titik
-    if (points.length >= 2) {
-      ctx.strokeStyle = "#00FF78";
-      ctx.lineWidth = 2;
-      ctx.lineJoin = "round";
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
-      }
-      ctx.stroke();
-    }
-
-    // 3. Garis penutup polygon
-    if (points.length >= 3) {
-      ctx.strokeStyle = "#00FF78";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(
-        points[points.length - 1].x,
-        points[points.length - 1].y
-      );
-      ctx.lineTo(points[0].x, points[0].y);
-      ctx.stroke();
-    }
-
-    // 4. Preview garis ke kursor
-    if (points.length > 0 && hoverPos && !dragging) {
-      ctx.strokeStyle = "rgba(180, 180, 180, 0.6)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(
-        points[points.length - 1].x,
-        points[points.length - 1].y
-      );
-      ctx.lineTo(hoverPos.x, hoverPos.y);
-      ctx.stroke();
-
-      // Preview balik ke titik pertama
-      if (points.length >= 2) {
-        ctx.strokeStyle = "rgba(100, 100, 100, 0.4)";
+      if (pts.length >= 3) {
+        ctx.fillStyle = fillColor;
         ctx.beginPath();
-        ctx.moveTo(hoverPos.x, hoverPos.y);
-        ctx.lineTo(points[0].x, points[0].y);
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (pts.length >= 2) {
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
         ctx.stroke();
       }
-      ctx.setLineDash([]);
-    }
 
-    // 5. Lingkaran titik + label
-    points.forEach((pt, i) => {
-      const isFirst = i === 0 && points.length >= 3;
+      if (pts.length >= 3) {
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.lineTo(pts[0].x, pts[0].y);
+        ctx.stroke();
+      }
 
-      // Outer
-      ctx.fillStyle = isFirst
-        ? "#00B4FF"
-        : "#00E650";
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, POINT_OUTER, 0, Math.PI * 2);
-      ctx.fill();
+      if (isActive && pts.length > 0 && hoverPos && !dragging) {
+        ctx.strokeStyle = "rgba(180, 180, 180, 0.8)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.lineTo(hoverPos.x, hoverPos.y);
+        ctx.stroke();
 
-      // Border hitam
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1;
-      ctx.stroke();
+        if (pts.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(hoverPos.x, hoverPos.y);
+          ctx.lineTo(pts[0].x, pts[0].y);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
 
-      // Inner
-      ctx.fillStyle = isFirst
-        ? "#0064C8"
-        : "#FFFFFF";
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, POINT_INNER, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Label nomor
-      ctx.font = "bold 11px sans-serif";
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 3;
-      ctx.strokeText(
-        String(i + 1), pt.x + 10, pt.y - 8
-      );
-      ctx.fillStyle = "#FFF";
-      ctx.fillText(
-        String(i + 1), pt.x + 10, pt.y - 8
-      );
+      pts.forEach((pt, i) => {
+        const isFirst = i === 0 && pts.length >= 3;
+        ctx.fillStyle = isYellow 
+          ? (isFirst ? "#FFAA00" : "#FFFF00") 
+          : (isFirst ? "#880000" : "#FF5555");
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, POINT_OUTER, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
     });
-  }, [points, hoverPos, dragging]);
-
-  //////////////////////////////////////////////////
-  // RE-DRAW setiap kali state berubah
-  //////////////////////////////////////////////////
+  }, [zones, activeZoneId, hoverPos, dragging]);
 
   useEffect(() => {
     drawOverlay();
   }, [drawOverlay]);
-
-  //////////////////////////////////////////////////
-  // MOUSE COORDINATES dari event
-  //////////////////////////////////////////////////
 
   const getMousePos = (e) => {
     const canvas = canvasRef.current;
@@ -324,59 +231,71 @@ export default function VirtualFenceCanvas({
     };
   };
 
-  const distance = (a, b) =>
-    Math.sqrt(
-      (a.x - b.x) ** 2 + (a.y - b.y) ** 2
-    );
-
-  //////////////////////////////////////////////////
-  // MOUSE DOWN → drag atau tambah titik
-  //////////////////////////////////////////////////
+  const distance = (a, b) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 
   const handleMouseDown = (e) => {
-    if (e.button !== 0) return; // hanya klik kiri
-    const pos = getMousePos(e);
+    if (e.button !== 0) return;
+    let pos = getMousePos(e);
 
-    // Cek drag: klik dekat titik yang sudah ada
-    for (let i = 0; i < points.length; i++) {
-      if (distance(pos, points[i]) < DRAG_RADIUS) {
+    const activePolygon = zones.find(z => z.id === activeZoneId).polygon;
+
+    for (let i = 0; i < activePolygon.length; i++) {
+      if (distance(pos, activePolygon[i]) < DRAG_RADIUS) {
         setDragging(true);
         setDragIndex(i);
         return;
       }
     }
 
-    // Snap ke titik pertama → tutup polygon
-    if (points.length >= 3) {
-      if (distance(pos, points[0]) < SNAP_RADIUS) {
-        return; // polygon sudah tertutup
+    if (activePolygon.length >= 3) {
+      if (distance(pos, activePolygon[0]) < SNAP_RADIUS) {
+        return;
       }
     }
 
-    // Tambah titik baru
-    setPoints((prev) => [...prev, pos]);
+    // Fitur Snap: Cari zona lain, jika ada titik yang dekat, maka kunci koordinatnya
+    const otherZone = zones.find(z => z.id !== activeZoneId);
+    if (otherZone && otherZone.polygon) {
+      for (let pt of otherZone.polygon) {
+        if (distance(pos, pt) < SNAP_RADIUS) {
+          pos = { x: pt.x, y: pt.y };
+          break;
+        }
+      }
+    }
+
+    setZones(prev => prev.map(z => 
+      z.id === activeZoneId 
+        ? { ...z, polygon: [...z.polygon, pos] }
+        : z
+    ));
   };
 
-  //////////////////////////////////////////////////
-  // MOUSE MOVE → update hover / drag
-  //////////////////////////////////////////////////
-
   const handleMouseMove = (e) => {
-    const pos = getMousePos(e);
+    let pos = getMousePos(e);
+
+    // Fitur Snap saat kursor ditarik / melayang
+    const otherZone = zones.find(z => z.id !== activeZoneId);
+    if (otherZone && otherZone.polygon) {
+      for (let pt of otherZone.polygon) {
+        if (distance(pos, pt) < SNAP_RADIUS) {
+          pos = { x: pt.x, y: pt.y };
+          break;
+        }
+      }
+    }
+
     setHoverPos(pos);
 
     if (dragging && dragIndex >= 0) {
-      setPoints((prev) => {
-        const copy = [...prev];
-        copy[dragIndex] = pos;
-        return copy;
-      });
+      setZones(prev => prev.map(z => {
+        if (z.id !== activeZoneId) return z;
+        const newPoly = [...z.polygon];
+        newPoly[dragIndex] = pos;
+        return { ...z, polygon: newPoly };
+      }));
     }
   };
-
-  //////////////////////////////////////////////////
-  // MOUSE UP → selesai drag
-  //////////////////////////////////////////////////
 
   const handleMouseUp = () => {
     if (dragging) {
@@ -385,91 +304,40 @@ export default function VirtualFenceCanvas({
     }
   };
 
-  //////////////////////////////////////////////////
-  // CONTEXT MENU → hapus titik terakhir
-  //////////////////////////////////////////////////
-
   const handleContextMenu = (e) => {
     e.preventDefault();
-    setPoints((prev) => prev.slice(0, -1));
+    setZones(prev => prev.map(z => 
+      z.id === activeZoneId 
+        ? { ...z, polygon: z.polygon.slice(0, -1) }
+        : z
+    ));
   };
 
-  //////////////////////////////////////////////////
-  // KEYBOARD SHORTCUTS
-  //////////////////////////////////////////////////
-
-  useEffect(() => {
-    const handler = (e) => {
-      // R → reset
-      if (e.key === "r" || e.key === "R") {
-        // Jangan intercept jika sedang di input
-        if (
-          e.target.tagName === "INPUT" ||
-          e.target.tagName === "TEXTAREA"
-        ) return;
-        setPoints([]);
-        setHoverPos(null);
-      }
-
-      // Enter atau S → simpan
-      if (
-        e.key === "Enter" ||
-        e.key === "s" ||
-        e.key === "S"
-      ) {
-        if (
-          e.target.tagName === "INPUT" ||
-          e.target.tagName === "TEXTAREA"
-        ) return;
-        if (points.length >= 3) {
-          handleSave();
-        }
-      }
-
-      // Escape → batal
-      if (e.key === "Escape") {
-        onCancel();
-      }
-    };
-
-    window.addEventListener("keydown", handler);
-    return () =>
-      window.removeEventListener("keydown", handler);
-  }, [points, onCancel]);
-
-  //////////////////////////////////////////////////
-  // SIMPAN POLYGON
-  //////////////////////////////////////////////////
-
-  const handleSave = async () => {
-    if (points.length < 3 || saving) return;
+  const handleSave = useCallback(async () => {
+    if (saving) return;
+    
+    // ensure at least one valid polygon is saved, or handle empty gracefully?
+    // Let's allow saving even if only one zone is configured.
+    
     setSaving(true);
 
     try {
-      // Konversi display → koordinat asli
       const { sx, sy } = getScale();
-      const polygon = points.map((p) => [
-        Math.round(p.x / sx),
-        Math.round(p.y / sy),
-      ]);
+      const payloadZones = zones.map(z => ({
+        id: z.id,
+        name: z.name,
+        polygon: z.polygon.map(p => [Math.round(p.x / sx), Math.round(p.y / sy)])
+      }));
 
-      await saveFence(cameraId, polygon);
+      await saveFence(cameraId, payloadZones);
 
-      // Coba reload worker via MQTT
       try {
         await reloadFence();
       } catch {
-        // Tidak fatal jika MQTT gagal
-        console.warn(
-          "Reload MQTT gagal, worker perlu restart manual"
-        );
+        console.warn("Reload MQTT gagal, worker perlu restart manual");
       }
 
-      setToast({
-        type: "success",
-        msg: "✓ Virtual Fence tersimpan!",
-      });
-
+      setToast({ type: "success", msg: "Virtual Fence tersimpan!" });
       setTimeout(() => {
         setToast(null);
         onSave();
@@ -478,56 +346,61 @@ export default function VirtualFenceCanvas({
       console.error("Gagal menyimpan:", err);
       setToast({
         type: "error",
-        msg: "✗ Gagal menyimpan: " +
-          (err.response?.data?.error || err.message),
+        msg: "Gagal menyimpan: " + (err.response?.data?.error || err.message),
       });
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSaving(false);
     }
-  };
+  }, [cameraId, getScale, onSave, saving, zones]);
 
-  //////////////////////////////////////////////////
-  // RESET
-  //////////////////////////////////////////////////
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "r" || e.key === "R") {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        setZones(prev => prev.map(z => 
+          z.id === activeZoneId ? { ...z, polygon: [] } : z
+        ));
+        setHoverPos(null);
+      }
+      if (e.key === "Enter" || e.key === "s" || e.key === "S") {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        handleSave();
+      }
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeZoneId, handleSave, onCancel]);
 
   const handleReset = () => {
-    setPoints([]);
+    setZones(prev => prev.map(z => 
+      z.id === activeZoneId ? { ...z, polygon: [] } : z
+    ));
     setHoverPos(null);
   };
 
-  //////////////////////////////////////////////////
-  // STATUS BANNER
-  //////////////////////////////////////////////////
-
-  const getBanner = () => {
-    const n = points.length;
-    if (n === 0)
-      return {
-        cls: "vf-banner--empty",
-        text: "Klik untuk menentukan batas zona deteksi gajah",
-      };
-    if (n < 3)
-      return {
-        cls: "vf-banner--progress",
-        text: `Tambah ${3 - n} titik lagi...`,
-      };
-    return {
-      cls: "vf-banner--ready",
-      text: `✓ READY — ${n} titik [Klik Simpan atau tekan Enter]`,
-    };
-  };
-
-  const banner = getBanner();
-
-  //////////////////////////////////////////////////
-  // RENDER
-  //////////////////////////////////////////////////
+  const activeZoneLength = zones.find(z => z.id === activeZoneId).polygon.length;
 
   return (
     <div className="vf-container">
+      <div className="vf-zone-selector" style={{display: 'flex', gap: '10px', padding: '10px', background: '#222', color: '#fff', justifyContent: 'center'}}>
+        <button 
+          style={{padding: '8px 16px', borderRadius: '4px', border: activeZoneId === 'yellow' ? '2px solid yellow' : '1px solid #666', background: activeZoneId === 'yellow' ? 'rgba(255, 255, 0, 0.2)' : 'transparent', color: 'white', cursor: 'pointer'}}
+          onClick={() => setActiveZoneId('yellow')}
+        >
+          Zona Peringatan (Kuning)
+        </button>
+        <button 
+          style={{padding: '8px 16px', borderRadius: '4px', border: activeZoneId === 'red' ? '2px solid red' : '1px solid #666', background: activeZoneId === 'red' ? 'rgba(255, 0, 0, 0.2)' : 'transparent', color: 'white', cursor: 'pointer'}}
+          onClick={() => setActiveZoneId('red')}
+        >
+          Zona Bahaya (Merah)
+        </button>
+      </div>
 
-      {/* CANVAS WRAPPER - PENUH LAYAR */}
       <div
         className="vf-canvas-wrapper"
         ref={wrapperRef}
@@ -536,6 +409,7 @@ export default function VirtualFenceCanvas({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onContextMenu={handleContextMenu}
+        style={{ height: 'calc(100% - 100px)' }}
       >
         <img
           ref={imgRef}
@@ -545,20 +419,14 @@ export default function VirtualFenceCanvas({
           crossOrigin="anonymous"
         />
         <canvas ref={canvasRef} />
-
-        {/* TOAST */}
         {toast && (
-          <div
-            className={`vf-toast vf-toast--${toast.type}`}
-          >
+          <div className={`vf-toast vf-toast--${toast.type}`}>
             {toast.msg}
           </div>
         )}
       </div>
 
-      {/* FOOTER - INSTRUKSI & TOMBOL DI LUAR GAMBAR */}
       <div className="vf-footer">
-        {/* INSTRUKSI */}
         <div className="vf-instructions">
           <span>
             <strong>Klik Kiri</strong>=Tambah Titik
@@ -574,38 +442,25 @@ export default function VirtualFenceCanvas({
             &nbsp;|&nbsp;
             <strong>Esc</strong>=Batal
             &nbsp;|&nbsp;
-            Titik: <strong>{points.length}</strong>
-            &nbsp;|&nbsp;
-            Min. 3 titik
+            Titik Aktif: <strong>{activeZoneLength}</strong>
           </span>
         </div>
-
-        {/* TOMBOL AKSI */}
         <div className="vf-actions">
           <button
             className="vf-btn vf-btn--save"
             onClick={handleSave}
-            disabled={points.length < 3 || saving}
+            disabled={saving}
           >
-            {saving ? "Menyimpan..." : "💾 Simpan"}
+            {saving ? "Menyimpan..." : "Simpan"}
           </button>
-
-          <button
-            className="vf-btn vf-btn--reset"
-            onClick={handleReset}
-          >
-            🔄 Reset
+          <button className="vf-btn vf-btn--reset" onClick={handleReset}>
+            Reset
           </button>
-
-          <button
-            className="vf-btn vf-btn--cancel"
-            onClick={onCancel}
-          >
-            ✕ Batal
+          <button className="vf-btn vf-btn--cancel" onClick={onCancel}>
+            Batal
           </button>
         </div>
       </div>
-
     </div>
   );
 }
