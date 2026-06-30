@@ -94,25 +94,47 @@ export default function Trend() {
   );
   let previousAlarmActive = false;
 
+  const getResultValue = (result, ...labels) => {
+    const lines = (result || "").split("\n");
+
+    for (const line of lines) {
+      const separatorIndex = line.indexOf(":");
+      if (separatorIndex === -1) continue;
+
+      const key = line.slice(0, separatorIndex).trim();
+      const value = line.slice(separatorIndex + 1).trim();
+
+      if (labels.includes(key)) {
+        return value;
+      }
+    }
+
+    return "";
+  };
+
   chronologicalData.forEach((item) => {
 
     const date =
       item.timestamp.split(" ")[0];
     const result = item.result || "";
-    const isAlarmActive =
-      result.includes("PERINGATAN");
-    const eventMatch = result.match(
-      /Alarm event baru:\s*(\d+)/
+    const alarmCount = Number(
+      getResultValue(result, "Alarm Count", "Alarm count")
     );
-    const isNewAlarmEvent = eventMatch
-      ? Number(eventMatch[1]) > 0
-      : isAlarmActive && !previousAlarmActive;
+    const isAlarmActive =
+      result.includes("PERINGATAN") ||
+      result.includes("BAHAYA");
+    const isNewAlarmEvent =
+      Number.isFinite(alarmCount)
+        ? false
+        : isAlarmActive && !previousAlarmActive;
 
     if (!grouped[date]) {
       grouped[date] = 0;
     }
 
-    if (isNewAlarmEvent) {
+    if (Number.isFinite(alarmCount)) {
+      grouped[date] = Math.max(grouped[date], alarmCount);
+    } else if (isNewAlarmEvent) {
       grouped[date] += 1;
     }
 

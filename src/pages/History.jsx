@@ -118,9 +118,9 @@ export default function History() {
     return [
       `Camera ID: ${cameraId}`,
       `Jumlah Total Gajah: ${totalElephants}`,
-      `Jumlah Gajah Masuk Area: ${elephantsEntered}`,
-      `Status: ${status}`,
-      `Alarm count: ${alarmCount}`,
+      `Jumlah Gajah Memasuki Area: ${elephantsEntered}`,
+      `Status Alarm: ${status}`,
+      `Alarm Count: ${alarmCount}`,
     ].join("\n");
   };
 
