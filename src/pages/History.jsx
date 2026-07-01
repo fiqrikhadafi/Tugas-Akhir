@@ -6,21 +6,13 @@ import elephantIcon from "../assets/elephant.svg";
 export default function History() {
 
   const [data, setData] = useState([]);
-  const [username, setUsername] = useState("");
+  const [username] = useState(
+    () => localStorage.getItem("username") || "User"
+  );
 
   const navigate = useNavigate();
 
   const location = useLocation();
-
-  // =====================================
-  // GET USERNAME
-  // =====================================
-  useEffect(() => {
-    const storedUsername =
-      localStorage.getItem("username") ||
-      "User";
-    setUsername(storedUsername);
-  }, []);
 
   // =====================================
   // HANDLE LOGOUT
@@ -42,31 +34,36 @@ export default function History() {
     params.get("camera");
 
   // =====================================
-  // FETCH DATA
-  // =====================================
-  const fetchData = async () => {
-
-    try {
-
-      const res = await getHistory(
-        selectedCamera
-      );
-
-      setData(res);
-
-    } catch (err) {
-
-      console.error(err);
-
-    }
-  };
-
-  // =====================================
   // LOAD DATA
   // =====================================
   useEffect(() => {
 
-    fetchData();
+    let ignore = false;
+
+    const loadData = async () => {
+
+      try {
+
+        const res = await getHistory(
+          selectedCamera
+        );
+
+        if (!ignore) {
+          setData(res);
+        }
+
+      } catch (err) {
+
+        console.error(err);
+
+      }
+    };
+
+    loadData();
+
+    return () => {
+      ignore = true;
+    };
 
   }, [selectedCamera]);
 
@@ -109,18 +106,23 @@ export default function History() {
       "-";
     const alarmCount =
       getValue(
+        "Alarm Event Count",
         "Alarm Count",
         "Alarm count"
       ) ||
       elephantsEntered ||
       0;
+    const alarmActivationCount =
+      getValue("Alarm Activation Count") ||
+      "-";
 
     return [
       `Camera ID: ${cameraId}`,
       `Jumlah Total Gajah: ${totalElephants}`,
       `Jumlah Gajah Memasuki Area: ${elephantsEntered}`,
       `Status Alarm: ${status}`,
-      `Alarm Count: ${alarmCount}`,
+      `Alarm Event Count: ${alarmCount}`,
+      `Alarm Activation Count: ${alarmActivationCount}`,
     ].join("\n");
   };
 

@@ -19,21 +19,13 @@ import {
 export default function Trend() {
 
   const [data, setData] = useState([]);
-  const [username, setUsername] = useState("");
+  const [username] = useState(
+    () => localStorage.getItem("username") || "User"
+  );
 
   const navigate = useNavigate();
 
   const location = useLocation();
-
-  //////////////////////////////////////////////////
-  // GET USERNAME
-  //////////////////////////////////////////////////
-  useEffect(() => {
-    const storedUsername =
-      localStorage.getItem("username") ||
-      "User";
-    setUsername(storedUsername);
-  }, []);
 
   //////////////////////////////////////////////////
   // HANDLE LOGOUT
@@ -55,37 +47,42 @@ export default function Trend() {
     params.get("camera");
 
   //////////////////////////////////////////////////
-  // FETCH DATA
-  //////////////////////////////////////////////////
-  const fetchData = async () => {
-
-    try {
-
-      const res = await getHistory(
-        selectedCamera
-      );
-
-      setData(res);
-
-    } catch (err) {
-
-      console.error(err);
-
-    }
-  };
-
-  //////////////////////////////////////////////////
   // LOAD DATA
   //////////////////////////////////////////////////
   useEffect(() => {
 
-    fetchData();
+    let ignore = false;
+
+    const loadData = async () => {
+
+      try {
+
+        const res = await getHistory(
+          selectedCamera
+        );
+
+        if (!ignore) {
+          setData(res);
+        }
+
+      } catch (err) {
+
+        console.error(err);
+
+      }
+    };
+
+    loadData();
+
+    return () => {
+      ignore = true;
+    };
 
   }, [selectedCamera]);
 
   //////////////////////////////////////////////////
   // PROCESS DATA
-  // JUMLAH AKTIVASI ALARM PER HARI
+  // JUMLAH KEJADIAN ALARM PER HARI
   //////////////////////////////////////////////////
   const grouped = {};
   const chronologicalData = [...data].sort(
@@ -117,23 +114,32 @@ export default function Trend() {
     const date =
       item.timestamp.split(" ")[0];
     const result = item.result || "";
-    const alarmCount = Number(
-      getResultValue(result, "Alarm Count", "Alarm count")
+    const alarmEventCountValue = getResultValue(
+      result,
+      "Alarm Event Count",
+      "Alarm Count",
+      "Alarm count"
     );
+    const alarmEventCount =
+      alarmEventCountValue === ""
+        ? NaN
+        : Number(alarmEventCountValue);
     const isAlarmActive =
       result.includes("PERINGATAN") ||
       result.includes("BAHAYA");
-    const isNewAlarmEvent =
-      Number.isFinite(alarmCount)
-        ? false
-        : isAlarmActive && !previousAlarmActive;
+    const eventMatch = result.match(
+      /Alarm Event Baru:\s*(\d+)/i
+    );
+    const isNewAlarmEvent = eventMatch
+      ? Number(eventMatch[1]) > 0
+      : isAlarmActive && !previousAlarmActive;
 
     if (!grouped[date]) {
       grouped[date] = 0;
     }
 
-    if (Number.isFinite(alarmCount)) {
-      grouped[date] = Math.max(grouped[date], alarmCount);
+    if (Number.isFinite(alarmEventCount)) {
+      grouped[date] = Math.max(grouped[date], alarmEventCount);
     } else if (isNewAlarmEvent) {
       grouped[date] += 1;
     }
@@ -227,7 +233,7 @@ export default function Trend() {
         <div style={statsBox}>
 
           <h3 style={statsTitle}>
-            Total Aktivasi Alarm Hari Ini
+            Total Kejadian Alarm Hari Ini
           </h3>
 
           <h1 style={statsNumber}>
@@ -235,7 +241,7 @@ export default function Trend() {
           </h1>
 
           <div style={statsSubtext}>
-            Peringatan terdeteksi pada {new Date(today + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            Kejadian peringatan/bahaya pada {new Date(today + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
 
         </div>
@@ -244,7 +250,7 @@ export default function Trend() {
         <div style={chartBox}>
 
           <h3 style={chartTitle}>
-            Grafik Aktivitas Alarm per Hari
+            Grafik Kejadian Alarm per Hari
           </h3>
 
           <ResponsiveContainer
